@@ -1,0 +1,16 @@
+services:
+  db:
+    image: postgres:15
+    container_name: ml_db
+    environment:
+      POSTGRES_USER: ml_user
+      POSTGRES_PASSWORD: ml_pass
+      POSTGRES_DB: ml_experiments
+    ports:
+      - "5432:5432"
+    volumes:
+      - db_data:/var/lib/postgresql/data
+      - ./migrations/001_create_all_tables_up.sql:/docker-entrypoint-initdb.d/001_create_all_tables_up.sql
+
+volumes:
+  db_data:

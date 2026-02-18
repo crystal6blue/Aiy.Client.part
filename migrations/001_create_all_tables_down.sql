@@ -1,0 +1,5 @@
+DROP TABLE IF EXISTS artifacts;
+DROP TABLE IF EXISTS metrics;
+DROP TABLE IF EXISTS parameters;
+DROP TABLE IF EXISTS experiment_runs;
+DROP TABLE IF EXISTS experiments;
