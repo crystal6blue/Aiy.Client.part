@@ -28,6 +28,9 @@ class ExperimentService:
         if not experiment:
             raise ValueError(f"Experiment with id {run.experiment_id} not found")
 
+        if run.version < 0:
+            raise ValueError(f"Run version cannot be negative: {run.version}")
+        
         existing_versions = self.repo.get_run_versions(run.experiment_id)
         if run.version in existing_versions:
             raise ValueError(f"Run with version {run.version} already exists for this experiment")
