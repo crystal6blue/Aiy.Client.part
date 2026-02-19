@@ -4,6 +4,7 @@ from sqlalchemy.orm import relationship, declarative_base
 
 Base = declarative_base()
 
+
 class Experiment(Base):
     __tablename__ = "experiments"
     id = Column(Integer, primary_key=True, index=True)
@@ -51,3 +52,4 @@ class Artifact(Base):
     run_id = Column(Integer, ForeignKey("experiment_runs.id", ondelete="CASCADE"))
     file_path = Column(Text, nullable=False)
     type = Column(String(50))
+
