@@ -1,16 +1,13 @@
-from datetime import datetime
+from pydantic import BaseModel, Field
 from typing import List, Optional
-from pydantic import BaseModel
-
+from datetime import datetime
 
 class ExperimentBase(BaseModel):
     name: str
     description: Optional[str] = None
 
-
 class ExperimentCreate(ExperimentBase):
     pass
-
 
 class ExperimentResponse(ExperimentBase):
     id: int
@@ -20,25 +17,23 @@ class ExperimentResponse(ExperimentBase):
         from_attributes = True
 
 
-class ExperimentRunBase(BaseModel):
+class ExperimentRunCreate(BaseModel):
+    experiment_id: int
     version: int
     status: Optional[str] = "running"
+    parameters: List[dict] = Field(default_factory=list)
+    metrics: List[dict] = Field(default_factory=list)
+    artifacts: List[dict] = Field(default_factory=list)
 
-
-class ExperimentRunCreate(ExperimentRunBase):
-    experiment_id: int
-    parameters: List[dict] = []
-    metrics: List[dict] = []
-    artifacts: List[dict] = []
-
-
-class ExperimentRunResponse(ExperimentRunBase):
+class ExperimentRunResponse(BaseModel):
     id: int
     experiment_id: int
+    version: int
+    status: str
     started_at: datetime
-    parameters: List[dict] = []
-    metrics: List[dict] = []
-    artifacts: List[dict] = []
+    parameters: List[dict] = Field(default_factory=list)
+    metrics: List[dict] = Field(default_factory=list)
+    artifacts: List[dict] = Field(default_factory=list)
 
     class Config:
         from_attributes = True
