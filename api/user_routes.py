@@ -1,24 +1,59 @@
 from utils.logger_conf import logger
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
-from db.database import SessionLocal
+from db.database import get_db
 from services.user_service import UserService
 
 router = APIRouter()
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/users/login")
 
-# Dependency for database session
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
+def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
+    payload = UserService.decode_access_token(token)
+    if payload is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Could not validate credentials",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    email: str = payload.get("sub")
+    if email is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Could not validate credentials",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    user = UserService.get_user_by_email(db, email=email)
+    if user is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="User not found",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    return user
+
+@router.post("/login")
+def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
+    user = UserService.get_user_by_email(db, email=form_data.username)
+    if not user or not UserService.verify_password(form_data.password, user.hashed_password):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect username or password",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    
+    access_token = UserService.create_access_token(data={"sub": user.email})
+    return {"access_token": access_token, "token_type": "bearer"}
+
+@router.get("/me")
+def read_users_me(current_user=Depends(get_current_user)):
+    return current_user
 
 @router.post("/test-user")
-def create_test_user(username: str, email: str, db: Session = Depends(get_db)):
+def create_test_user(username: str, email: str, password: str, db: Session = Depends(get_db)):
     logger.info(f"Attempting to create test user: {username} ({email})")
     try:
-        new_user = UserService.create_user(db, username=username, email=email)
+        new_user = UserService.create_user(db, username=username, email=email, password=password)
         logger.success(f"User created successfully: ID {new_user.id}")
         return {"status": "success", "user_id": new_user.id}
     except Exception as e:

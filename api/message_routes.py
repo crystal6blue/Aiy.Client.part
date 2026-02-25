@@ -1,35 +1,21 @@
 from utils.logger_conf import logger
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from db.database import SessionLocal
+from db.database import get_db
 from services.chat_service import ChatService
 from services.message_service import MessageService
 
 router = APIRouter()
 
-
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
-
-
-
 @router.get("/{chat_id}")
 def get_chat_with_messages(chat_id: int, db: Session = Depends(get_db)):
     # This retrieves the chat and all associated messages via the relationship
     logger.debug(f"Retrieving chat with messages for chat_id: {chat_id}")
-    chat = ChatService.get_chat(db, chat_id)
-    if not chat:
+    chat_details = ChatService.get_chat_details(db, chat_id)
+    if not chat_details:
         logger.warning(f"Chat not found: ID {chat_id}")
         raise HTTPException(status_code=404, detail="Chat not found")
-    return {
-        "chat_id": chat.id,
-        "type": chat.requestType,
-        "messages": chat.messages  # SQLAlchemy automatically loads these
-    }
+    return chat_details
 
 # 1. CREATE Message with File/Audio & Metadata
 @router.post("/{chat_id}/send")

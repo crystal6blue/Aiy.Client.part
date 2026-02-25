@@ -17,3 +17,14 @@ class ChatService:
     @staticmethod
     def get_user_chats(db: Session, user_id: int):
         return db.query(Chat).filter(Chat.user_id == user_id).all()
+
+    @staticmethod
+    def get_chat_details(db: Session, chat_id: int):
+        chat = ChatService.get_chat(db, chat_id)
+        if not chat:
+            return None
+        return {
+            "chat_id": chat.id,
+            "type": chat.requestType,
+            "messages": chat.messages
+        }

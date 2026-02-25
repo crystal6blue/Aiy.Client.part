@@ -1,18 +1,11 @@
 from utils.logger_conf import logger
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from db.database import SessionLocal
+from db.database import get_db
 from services.chat_service import ChatService
 from services.message_service import MessageService
 
 router = APIRouter()
-
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
 
 @router.post("/new/{user_id}")
 def create_chat(user_id: int, request_type: str = "text", db: Session = Depends(get_db)):
