@@ -1,42 +1,43 @@
-services:
-  db:
-    image: postgres:15
-    container_name: ml_db
-    environment:
-      POSTGRES_USER: ml_user
-      POSTGRES_PASSWORD: ml_pass
-      POSTGRES_DB: ml_experiments
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ml_user -d ml_experiments"]
-      interval: 5s
-      timeout: 5s
-      retries: 10
-    volumes:
-      - db_data:/var/lib/postgresql/data
-      - ./migrations/001_create_all_tables_up.sql:/docker-entrypoint-initdb.d/001_create_all_tables_up.sql
-    networks:
-      - ml_network
+version: '3.8'
 
-  api:
-    build: .
-    container_name: ml_api
+services:
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.11.1
+    container_name: elasticsearch
     environment:
-      DATABASE_URL: postgresql+psycopg2://ml_user:ml_pass@db:5432/ml_experiments
-      LOG_DIR: logs
-    depends_on:
-      db:
-        condition: service_healthy
+      - discovery.type=single-node
+      - xpack.security.enabled=false
     ports:
-      # This binds the port ONLY to your laptop's localhost
-      - "127.0.0.1:8000:8000" 
-    volumes:
-      - .:/app
+      - "9200:9200"
     networks:
-      - ml_network
+      - elk
+
+  logstash:
+    image: docker.elastic.co/logstash/logstash:8.11.1
+    container_name: logstash
+    volumes:
+      - ./logstash/pipeline:/usr/share/logstash/pipeline
+      - ./logs:/logs
+    ports:
+      - "5044:5044"
+    depends_on:
+      - elasticsearch
+    networks:
+      - elk
+
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.11.1
+    container_name: kibana
+    ports:
+      - "5601:5601"
+    environment:
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+    depends_on:
+      - elasticsearch
+    networks:
+      - elk
 
 networks:
-  ml_network:
+  elk:
     driver: bridge
-
-volumes:
-  db_data:
