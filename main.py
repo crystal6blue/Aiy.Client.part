@@ -5,8 +5,9 @@ from api.chat_routes import router as chat_router
 from api.message_routes import router as message_router
 from utils.logger_conf import logger
 from fastapi import FastAPI
-from db.database import engine, Base
+from db.database import engine, Base, SessionLocal
 from api.user_routes import router as user_router
+
 
 Base.metadata.create_all(bind=engine)
 

@@ -1,14 +1,16 @@
 from utils.logger_conf import logger
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from db.database import get_db
 from services.user_service import UserService
+from utils.rate_limiter import rate_limiter
+from utils.user_logger import log_user_action, get_user_logs
 
 router = APIRouter()
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/users/login")
 
-def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
+def get_current_user(request: Request, token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
     payload = UserService.decode_access_token(token)
     if payload is None:
         raise HTTPException(
@@ -30,12 +32,16 @@ def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(
             detail="User not found",
             headers={"WWW-Authenticate": "Bearer"},
         )
+    request.state.user = user
     return user
 
 @router.post("/login")
-def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
+def login(request: Request, form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
     user = UserService.get_user_by_email(db, email=form_data.username)
     if not user or not UserService.verify_password(form_data.password, user.hashed_password):
+        if user:
+            logger.bind(service="application", track=f"user_uuid:{user.uuid}").info(f"{request.method} {request.url.path} | login_failed")
+            log_user_action("login_failed", {"reason": "incorrect_password"}, user_uuid=user.uuid)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect username or password",
@@ -43,11 +49,19 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depend
         )
     
     access_token = UserService.create_access_token(data={"sub": user.email})
+    logger.bind(service="application", track=f"user_uuid:{user.uuid}").info(f"{request.method} {request.url.path} | login_success")
+    log_user_action("login_success", user_uuid=user.uuid)
     return {"access_token": access_token, "token_type": "bearer"}
 
-@router.get("/me")
-def read_users_me(current_user=Depends(get_current_user)):
+@router.get("/me", dependencies=[Depends(rate_limiter)])
+def read_users_me(request: Request, current_user=Depends(get_current_user)):
+    logger.bind(service="application", track=f"user_uuid:{current_user.uuid}").info(f"{request.method} {request.url.path} | view_profile")
+    log_user_action("view_profile", user_uuid=current_user.uuid)
     return current_user
+
+@router.get("/logs")
+def read_user_logs(current_user=Depends(get_current_user)):
+    return get_user_logs(f"user_uuid:{current_user.uuid}")
 
 @router.post("/test-user")
 def create_test_user(username: str, email: str, password: str, db: Session = Depends(get_db)):
